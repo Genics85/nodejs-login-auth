@@ -53,12 +53,64 @@ passport.use((new localStrategy(function (username,password,done){
     })
 })));
 
-app.get('/',function (req,res){
+//login checker
+function isLoggedIn(req,res,next){
+    if(req.isAuthenticated()) return next();
+    res.redirect("/login");
+}
+
+//logout checker
+function isLoggedOut(req,res,next){
+    if(!req.isAuthenticated()) return next();
+    res.redirect("/");
+}
+//ROUTES
+app.get('/',isLoggedIn,function (req,res){
     res.render("index",{title:"Home"})
 });
 
-app.get("/login",function (req,res){
-    res.render("login",{title:"Login"})
+app.post("/login",passport.authenticate("local",{
+    successRedirect:"/",
+    failureRedirect:"/login?error=true"
+}))
+app.get("/login",isLoggedOut,function (req,res){
+    const response={
+        title:"Login",
+        error:req.query.error
+    }
+    res.render("login",response)
+})
+
+app.get("/logout",(req,res,next)=>{
+    req.logout(function(err){
+        if(err)return next(err);
+        res.redirect("/");
+    }); 
+})
+
+//seting up an admin user
+
+app.get("/setup",async (req,res)=>{
+    const exists= await user.exists({username:"admin"});
+
+    if(exists){
+        res.redirect("/login")
+        return;
+    }
+    bcrypt.genSalt(10,function(err,salt){
+        if(err) return next(err);
+        bcrypt.hash("pass",salt,function(err,hash){
+            if(err) return next(err);
+
+            const newAdmin=new user({
+                username:"Genics",
+                password:hash
+            })
+            newAdmin.save();
+            res.redirect("/login");
+            
+        })
+    })
 })
 
 app.listen(port,()=>{
